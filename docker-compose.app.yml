@@ -1,31 +1,12 @@
 version: "3.9"
 
 services:
-  # ── Redis ────────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: archiver_redis
-    restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redis_data:/data
-    ports:
-      - "127.0.0.1:6379:6379"   # bind to loopback only — not publicly exposed
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ── DB Init (one-shot) ───────────────────────────────────────────────────────
   init:
     build: .
     container_name: archiver_init
     command: python scripts/init_db.py
     env_file: .env
-    depends_on:
-      redis:
-        condition: service_healthy
     restart: "no"
 
   # ── Celery Worker ─────────────────────────────────────────────────────────────
@@ -35,8 +16,6 @@ services:
     command: celery -A src.celery_app worker --loglevel=${LOG_LEVEL:-INFO} --concurrency=4
     env_file: .env
     depends_on:
-      redis:
-        condition: service_healthy
       init:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -51,8 +30,6 @@ services:
     command: celery -A src.celery_app beat --loglevel=${LOG_LEVEL:-INFO} --scheduler celery.beat:PersistentScheduler
     env_file: .env
     depends_on:
-      redis:
-        condition: service_healthy
       init:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -61,5 +38,4 @@ services:
       - celerybeat_data:/app/celerybeat-schedule
 
 volumes:
-  redis_data:
   celerybeat_data:
