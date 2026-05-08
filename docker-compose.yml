@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  # ── QuestDB ──────────────────────────────────────────────────────────────────
+  questdb:
+    image: questdb/questdb:latest
+    container_name: archiver_questdb
+    restart: unless-stopped
+    environment:
+      QDB_TELEMETRY_ENABLED: "false"
+    volumes:
+      - questdb_data:/var/lib/questdb
+    ports:
+      - "9000:9000"   # HTTP API + ILP over HTTP + Web Console
+      - "9009:9009"   # ILP over TCP (optional)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/exec?query=SELECT+1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: archiver_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── DB Init (one-shot) ───────────────────────────────────────────────────────
+  init:
+    build: .
+    container_name: archiver_init
+    command: python scripts/init_db.py
+    env_file: .env
+    environment:
+      QUESTDB_HOST: questdb
+    depends_on:
+      questdb:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Celery Worker ─────────────────────────────────────────────────────────────
+  worker:
+    build: .
+    container_name: archiver_worker
+    command: celery -A src.celery_app worker --loglevel=${LOG_LEVEL:-INFO} --concurrency=4
+    env_file: .env
+    environment:
+      QUESTDB_HOST: questdb
+    depends_on:
+      questdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+
+  # ── Celery Beat (scheduler) ──────────────────────────────────────────────────
+  beat:
+    build: .
+    container_name: archiver_beat
+    command: celery -A src.celery_app beat --loglevel=${LOG_LEVEL:-INFO} --scheduler celery.beat:PersistentScheduler
+    env_file: .env
+    environment:
+      QUESTDB_HOST: questdb
+    depends_on:
+      questdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config:ro
+      - celerybeat_data:/app/celerybeat-schedule
+
+volumes:
+  questdb_data:
+  redis_data:
+  celerybeat_data:

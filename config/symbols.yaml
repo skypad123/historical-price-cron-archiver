@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Symbols configuration
+#
+# Structure:
+#   exchanges:
+#     <exchange_id>:          # any CCXT-supported exchange id (e.g. binance, bybit, okx)
+#       symbols:              # list of market symbols in CCXT format (BASE/QUOTE)
+#         - BASE/QUOTE
+#
+# Tasks run per-minute for every exchange × symbol combination:
+#   - OHLCV   (1m candle)
+#   - Ticker  (realtime best bid/ask + last price)
+#   - Orderbook (snapshot, configurable depth below)
+#
+# Global settings
+# ─────────────────────────────────────────────────────────────────────────────
+settings:
+  orderbook_depth: 20       # number of levels to archive per side
+  ohlcv_timeframe: "1m"     # CCXT timeframe string
+
+exchanges:
+  binance:
+    symbols:
+      - BTC/USDT
+      - ETH/USDT
+      - SOL/USDT
+      - BNB/USDT
+
+  bybit:
+    symbols:
+      - BTC/USDT
+      - ETH/USDT
+
+  okx:
+    symbols:
+      - BTC/USDT
+      - ETH/USDT
+
+  kraken:
+    symbols:
+      - BTC/USD
+      - ETH/USD

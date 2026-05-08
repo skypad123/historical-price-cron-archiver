@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "historical-price-cron-archiver"
+version = "0.1.0"
+description = "Per-minute OHLCV, ticker, and orderbook archiver using CCXT + Celery + TimescaleDB"
+authors = ["sky"]
+readme = "README.md"
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ccxt = "^4.3"
+celery = { version = "^5.3", extras = ["redis"] }
+questdb = "^2.0"
+tenacity = "^8.3"
+pyyaml = "^6.0"
+python-dotenv = "^1.0"
+redis = "^5.0"
+requests = "^2.31"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^0.23"
+black = "^24.0"
+ruff = "^0.4"
+ipython = "^8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
