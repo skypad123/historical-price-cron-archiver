@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 """One-shot script to initialise QuestDB schema on first startup.
 
-Creates the ``ohlcv`` table explicitly with WAL + DEDUP so that duplicate
-(timestamp, exchange, symbol, timeframe) rows are silently dropped on
-re-ingestion.
+Applies every ``migrations/*.sql`` file in alphabetical order. All migration
+files must be idempotent (e.g. use ``IF NOT EXISTS``) — they are re-executed
+on every startup without tracking which have already run.
 
 ``ticker`` and ``orderbook`` are auto-created by QuestDB ILP on first write
-and do not need explicit creation.
-
-Safe to re-run — uses IF NOT EXISTS.
+and do not need explicit migration files.
 """
 
 from __future__ import annotations
@@ -16,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
@@ -25,21 +24,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-OHLCV_DDL = """
-CREATE TABLE IF NOT EXISTS ohlcv (
-    timestamp   TIMESTAMP,
-    exchange    SYMBOL,
-    symbol      SYMBOL,
-    timeframe   SYMBOL,
-    open        DOUBLE,
-    high        DOUBLE,
-    low         DOUBLE,
-    close       DOUBLE,
-    volume      DOUBLE
-) timestamp(timestamp)
-PARTITION BY DAY WAL
-DEDUP UPSERT KEYS(timestamp, exchange, symbol, timeframe);
-""".strip()
+MIGRATIONS_DIR = Path(__file__).parent.parent / "migrations"
 
 
 def get_http_url() -> str:
@@ -72,11 +57,20 @@ def run_ddl(sql: str) -> None:
     result = resp.json()
     if "error" in result:
         raise RuntimeError(f"DDL error: {result['error']}")
-    logger.info("DDL executed successfully")
+
+
+def run_migrations() -> None:
+    migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not migration_files:
+        logger.warning("No migration files found in %s", MIGRATIONS_DIR)
+        return
+    for path in migration_files:
+        logger.info("Applying migration: %s", path.name)
+        run_ddl(path.read_text())
+        logger.info("Applied: %s", path.name)
 
 
 if __name__ == "__main__":
     wait_for_questdb()
-    logger.info("Creating ohlcv table (WAL + DEDUP)...")
-    run_ddl(OHLCV_DDL)
+    run_migrations()
     logger.info("Schema initialisation complete")
