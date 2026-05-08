@@ -236,9 +236,10 @@ CELERY_RESULT_BACKEND=redis://<your-redis-host>:6379/1
 REDIS_URL=redis://<your-redis-host>:6379/0
 ```
 
-Boot the stack for the first time:
+Pull the pre-built image and boot the stack for the first time:
 
 ```bash
+docker compose -f docker-compose.app.yml pull
 docker compose -f docker-compose.app.yml up -d
 ```
 
@@ -260,16 +261,28 @@ In your GitHub repo go to **Settings → Secrets and variables → Actions** and
 
 ---
 
-### Step 4 — Deploy
+### Step 4 — Configure the image name in `docker-compose.app.yml`
+
+Replace `<OWNER>` and `<REPO>` in `docker-compose.app.yml` with your GitHub username and repo name:
+
+```yaml
+image: ghcr.io/<OWNER>/<REPO>:latest
+```
+
+For example: `ghcr.io/johndoe/historical-price-cron-archiver:latest`
+
+---
+
+### Step 5 — Deploy
 
 Every push to `main` automatically:
 
-1. SSHs into the Droplet
-2. Pulls latest code (`git pull origin main`)
-3. Rebuilds Docker images (`docker compose build --pull`)
-4. Force-recreates `worker` and `beat` with zero config changes needed
-5. Prunes old images to free disk space
-6. Prints container status
+1. Builds the Docker image on GitHub Actions (7 GB RAM — no OOM risk)
+2. Pushes the image to GitHub Container Registry (free)
+3. SSHs into the Droplet
+4. Pulls the latest image (`docker pull`)
+5. Force-recreates `worker` and `beat`
+6. Prunes old images
 
 To trigger a deploy:
 
