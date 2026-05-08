@@ -1,0 +1,41 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /app
+
+            echo "── Pulling latest code ──────────────────────────"
+            git pull origin main
+
+            echo "── Building images ──────────────────────────────"
+            docker compose -f docker-compose.app.yml build --pull
+
+            echo "── Restarting worker and beat ───────────────────"
+            docker compose -f docker-compose.app.yml up -d --force-recreate worker beat
+
+            echo "── Cleaning up old images ───────────────────────"
+            docker image prune -f
+
+            echo "── Done ─────────────────────────────────────────"
+            docker compose -f docker-compose.app.yml ps
