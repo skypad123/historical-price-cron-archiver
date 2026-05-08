@@ -27,7 +27,7 @@ services:
   beat:
     image: ghcr.io/<OWNER>/<REPO>:latest
     container_name: archiver_beat
-    command: celery -A src.celery_app beat --loglevel=${LOG_LEVEL:-INFO} --scheduler celery.beat:PersistentScheduler
+    command: celery -A src.celery_app beat --loglevel=${LOG_LEVEL:-INFO} --scheduler celery.beat:PersistentScheduler --schedule=/app/celerybeat-data/celerybeat-schedule
     env_file: .env
     depends_on:
       init:
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./config:/app/config:ro
-      - celerybeat_data:/app/celerybeat-schedule
+      - celerybeat_data:/app/celerybeat-data
 
 volumes:
   celerybeat_data:
