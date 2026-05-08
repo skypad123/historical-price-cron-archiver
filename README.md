@@ -181,6 +181,127 @@ asks  VARCHAR  →  "[[29501.0, 0.5], [29502.0, 2.1], ...]"
 
 ---
 
+## VPS Deployment (DigitalOcean)
+
+This section covers deploying `worker` and `beat` to a DigitalOcean Droplet with automatic deploys triggered by pushing to `main`. QuestDB is assumed to be running on a separate host (e.g. QuestDB Cloud or another VPS).
+
+### Infrastructure
+
+| Service | Where |
+|---------|-------|
+| QuestDB | External host (QuestDB Cloud / separate VPS) |
+| Redis | Runs on the app Droplet (Docker, loopback-only) |
+| Worker + Beat | App Droplet (`docker-compose.app.yml`) |
+
+---
+
+### Step 1 — Provision the Droplet
+
+Create a **Basic Droplet** ($6/mo, 1 vCPU / 1 GB RAM, Ubuntu 24.04) in the DigitalOcean console. Add your SSH public key during creation.
+
+---
+
+### Step 2 — First-time VPS setup
+
+SSH into the Droplet and run:
+
+```bash
+# Install Docker (includes Compose plugin)
+curl -fsSL https://get.docker.com | sh
+
+# Allow your user to run Docker without sudo (re-login after this)
+usermod -aG docker $USER
+
+# Verify
+docker compose version
+```
+
+Clone the repo and create the `.env` file:
+
+```bash
+git clone https://github.com/<you>/<repo>.git /app
+cd /app
+cp .env.example .env
+nano .env
+```
+
+Key values to set in `.env`:
+
+```bash
+QUESTDB_HOST=<your-questdb-host>   # QuestDB Cloud hostname or external IP
+QUESTDB_HTTP_PORT=9000
+QUESTDB_ILP_PORT=9000
+CELERY_BROKER_URL=redis://127.0.0.1:6379/0
+CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1
+REDIS_URL=redis://127.0.0.1:6379/0
+```
+
+Boot the stack for the first time:
+
+```bash
+docker compose -f docker-compose.app.yml up -d
+```
+
+This starts Redis, runs the `init` container to create the `ohlcv` table in QuestDB, then starts `worker` and `beat`.
+
+---
+
+### Step 3 — Configure GitHub Actions secrets
+
+In your GitHub repo go to **Settings → Secrets and variables → Actions** and add:
+
+| Secret | Value |
+|--------|-------|
+| `VPS_HOST` | Droplet public IP address |
+| `VPS_USER` | `root` (or your sudo user) |
+| `VPS_SSH_KEY` | Contents of your SSH private key (e.g. `~/.ssh/id_ed25519`) |
+
+> The `.env` file lives on the VPS only and is never committed to the repo. All application secrets stay off GitHub.
+
+---
+
+### Step 4 — Deploy
+
+Every push to `main` automatically:
+
+1. SSHs into the Droplet
+2. Pulls latest code (`git pull origin main`)
+3. Rebuilds Docker images (`docker compose build --pull`)
+4. Force-recreates `worker` and `beat` with zero config changes needed
+5. Prunes old images to free disk space
+6. Prints container status
+
+To trigger a deploy:
+
+```bash
+git push origin main
+```
+
+To monitor the deploy, watch the **Actions** tab in GitHub. To check container status on the VPS:
+
+```bash
+docker compose -f docker-compose.app.yml ps
+docker compose -f docker-compose.app.yml logs -f worker
+docker compose -f docker-compose.app.yml logs -f beat
+```
+
+---
+
+### Useful VPS commands
+
+```bash
+# Restart a specific service
+docker compose -f docker-compose.app.yml restart worker
+
+# View failure log
+tail -f /app/logs/failures.log
+
+# Pull and redeploy manually (same as CI does)
+cd /app && git pull origin main && docker compose -f docker-compose.app.yml up -d --force-recreate worker beat
+```
+
+---
+
 ## Development
 
 ### Install dependencies
@@ -244,7 +365,11 @@ pytest
 │       ├── ccxt_client.py  # Cached CCXT exchange factory
 │       ├── config_loader.py# symbols.yaml loader
 │       └── retry.py        # Tenacity exponential backoff decorator
-├── docker-compose.yml
+├── .github/
+│   └── workflows/
+│       └── deploy.yml      # Auto-deploy to VPS on push to main
+├── docker-compose.yml      # Full local stack (includes QuestDB)
+├── docker-compose.app.yml  # VPS stack (worker + beat + redis only)
 ├── Dockerfile
 └── .env.example
 ```
