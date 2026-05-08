@@ -3,7 +3,7 @@ version: "3.9"
 services:
   # ── DB Init (one-shot) ───────────────────────────────────────────────────────
   init:
-    image: ghcr.io/<OWNER>/<REPO>:latest
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
     container_name: archiver_init
     command: python scripts/init_db.py
     env_file: .env
@@ -11,7 +11,7 @@ services:
 
   # ── Celery Worker ─────────────────────────────────────────────────────────────
   worker:
-    image: ghcr.io/<OWNER>/<REPO>:latest
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
     container_name: archiver_worker
     command: celery -A src.celery_app worker --loglevel=${LOG_LEVEL:-INFO} --concurrency=4
     env_file: .env
@@ -25,7 +25,7 @@ services:
 
   # ── Celery Beat (scheduler) ──────────────────────────────────────────────────
   beat:
-    image: ghcr.io/<OWNER>/<REPO>:latest
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
     container_name: archiver_beat
     command: celery -A src.celery_app beat --loglevel=${LOG_LEVEL:-INFO} --scheduler celery.beat:PersistentScheduler --schedule=/app/celerybeat-data/celerybeat-schedule
     env_file: .env

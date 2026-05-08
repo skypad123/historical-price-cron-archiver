@@ -19,6 +19,7 @@ poetry.lock
 
 # Environment
 .env
+.env.prod
 
 # Celery beat schedule
 celerybeat-schedule

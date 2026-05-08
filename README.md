@@ -228,13 +228,16 @@ nano .env
 Key values to set in `.env`:
 
 ```bash
+GITHUB_REPOSITORY=your-github-username/historical-price-cron-archiver
 QUESTDB_HOST=<your-questdb-host>   # QuestDB Cloud hostname or external IP
 QUESTDB_HTTP_PORT=9000
 QUESTDB_ILP_PORT=9000
-CELERY_BROKER_URL=redis://<your-redis-host>:6379/0
-CELERY_RESULT_BACKEND=redis://<your-redis-host>:6379/1
-REDIS_URL=redis://<your-redis-host>:6379/0
+CELERY_BROKER_URL=rediss://:<password>@<your-redis-host>:6380/0?ssl_cert_reqs=CERT_NONE
+CELERY_RESULT_BACKEND=rediss://:<password>@<your-redis-host>:6380/1?ssl_cert_reqs=CERT_NONE
+REDIS_URL=rediss://:<password>@<your-redis-host>:6380/0?ssl_cert_reqs=CERT_NONE
 ```
+
+> If your Redis does **not** use SSL (e.g. a local or private-network Redis), use `redis://` instead of `rediss://` and omit the `ssl_cert_reqs` parameter.
 
 Pull the pre-built image and boot the stack for the first time:
 
@@ -261,15 +264,15 @@ In your GitHub repo go to **Settings → Secrets and variables → Actions** and
 
 ---
 
-### Step 4 — Configure the image name in `docker-compose.app.yml`
+### Step 4 — Set your image name in `.env`
 
-Replace `<OWNER>` and `<REPO>` in `docker-compose.app.yml` with your GitHub username and repo name:
+`docker-compose.app.yml` resolves the container image from the `GITHUB_REPOSITORY` environment variable. Set it in your `.env` file on the VPS:
 
-```yaml
-image: ghcr.io/<OWNER>/<REPO>:latest
+```bash
+GITHUB_REPOSITORY=your-github-username/historical-price-cron-archiver
 ```
 
-For example: `ghcr.io/johndoe/historical-price-cron-archiver:latest`
+This means `docker-compose.app.yml` never needs manual edits and `git pull` will always work cleanly.
 
 ---
 
@@ -310,7 +313,7 @@ docker compose -f docker-compose.app.yml restart worker
 tail -f /app/logs/failures.log
 
 # Pull and redeploy manually (same as CI does)
-cd /app && git pull origin main && docker compose -f docker-compose.app.yml up -d --force-recreate worker beat
+cd /app && git pull && docker compose -f docker-compose.app.yml up -d --force-recreate worker beat
 ```
 
 ---
