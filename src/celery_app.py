@@ -34,6 +34,7 @@ app = Celery(
         "src.tasks.ohlcv",
         "src.tasks.ticker",
         "src.tasks.orderbook",
+        "src.tasks.yfinance_ohlcv",
     ],
 )
 
@@ -70,5 +71,11 @@ app.conf.beat_schedule = {
         "task": "src.tasks.orderbook.dispatch_orderbook",
         "schedule": timedelta(minutes=1),
         "options": {"expires": 55},
+    },
+    # yfinance daily data — runs at 00:05 UTC every day
+    "archive-yfinance-ohlcv-daily": {
+        "task": "src.tasks.yfinance_ohlcv.dispatch_yfinance_ohlcv",
+        "schedule": crontab(hour=0, minute=5),
+        "options": {"expires": 3600},
     },
 }
