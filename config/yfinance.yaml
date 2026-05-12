@@ -1,0 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# yfinance archiver configuration
+#
+# tickers: list of Yahoo Finance ticker symbols to archive
+# settings.interval: yfinance interval string (1d, 1wk, 1mo, etc.)
+# settings.period:   history to fetch on a one-shot backfill run
+#                    (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+# ─────────────────────────────────────────────────────────────────────────────
+settings:
+  interval: "1d"
+  period: "max"
+
+tickers:
+  - 0P00006O9U.SI
